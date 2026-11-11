@@ -12,11 +12,11 @@ Cards come in light, dark or automatic themes, take a custom accent color, and r
 
 | Card | URL | Options |
 | --- | --- | --- |
-| Now playing | `/now-playing.svg` | `backdrop`: `true` (default) or `false` to drop the blurred cover |
-| Top list | `/top.svg` | `type`: `artists` (default), `albums` or `tracks`<br>`period`<br>`limit`: 1 to 10, default 5 |
-| Stats | `/stats.svg` | `period` |
+| Now playing | `/now-playing.svg` | `hide`: `art`, `backdrop` |
+| Top list | `/top.svg` | `type`: `artists` (default), `albums` or `tracks`<br>`period`<br>`limit`: 1 to 10, default 5<br>`height`: minimum card height; rows spread out to fill it<br>`title`<br>`hide`: `period`, `rank`, `art`, `plays`, `bars` |
+| Stats | `/stats.svg` | `period`<br>`title`<br>`hide`: `streak`, `chart`, `period` |
 
-`period` is `day` (past 24 hours), `week` (past 7 days, the default), `month` (past 30 days), `year` or `all_time`.
+`period` is `day` (past 24 hours), `week` (past 7 days, the default), `month` (past 30 days), `year` or `all_time`. `title` replaces the card's heading, up to 60 characters. `hide` takes a comma-separated list, like `hide=rank,plays`.
 
 Every card also takes:
 
@@ -24,10 +24,14 @@ Every card also takes:
 | --- | --- |
 | `theme` | `auto` (default; follows the viewer's system), `light` or `dark` |
 | `accent` | a hex color without `#`, like `accent=ff5500` |
+| `background` | a hex color for the card background |
+| `text` | a hex color for the main text |
 | `border` | `true` (default) or `false` |
 | `margin_bottom` | transparent space below the card, 0 to 200 (default 0), for spacing stacked cards |
 
 For example, `/top.svg?type=albums&period=year&limit=3&theme=dark`.
+
+Custom colors apply in both light and dark mode, while borders, bar tracks and secondary text keep the theme's colors. So pair them with the closest fixed theme, like `theme=dark&background=1e1b2e&text=f5e9ff`.
 
 ## Run it
 
@@ -80,12 +84,12 @@ Or use plain Markdown with the default `theme=auto`, which follows the viewer's 
 
 ### Two columns
 
-GitHub strips CSS from READMEs, but it keeps `align`, which floats images. Cards aligned left stack in the left column while the rest flow on the right, so each column fills from the top. `width="48%"` leaves room for the 20px padding GitHub adds to aligned images, and `margin_bottom=40` gives about the same gap vertically as between the columns.
+GitHub strips CSS from READMEs, but it keeps `align`, which floats images. Cards aligned left stack in the left column while the rest flow on the right, so each column fills from the top. `width="48%"` leaves room for the 20px padding GitHub adds to aligned images, `margin_bottom=40` gives about the same gap vertically as between the columns, and `height=428` ends the left column level with the right.
 
 ```html
 <p align="right">
 <a href="https://cards.example.com"><img src="https://cards.example.com/now-playing.svg?margin_bottom=40" width="48%" align="left"></a>
-<a href="https://cards.example.com"><img src="https://cards.example.com/top.svg?type=artists&limit=6" width="48%" align="left"></a>
+<a href="https://cards.example.com"><img src="https://cards.example.com/top.svg?type=artists&limit=6&height=428" width="48%" align="left"></a>
 <a href="https://cards.example.com"><img src="https://cards.example.com/stats.svg?margin_bottom=40" width="48%" align="top"></a>
 <a href="https://cards.example.com"><img src="https://cards.example.com/top.svg?type=tracks" width="48%" align="top"></a>
 </p>

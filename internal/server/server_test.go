@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -95,6 +96,7 @@ func newServerWithFakeKoito(t *testing.T, cacheTTL time.Duration) (*fakeKoito, *
 type renderedCard struct {
 	status           int
 	header           http.Header
+	body             string
 	texts            []string
 	imageHrefs       []string
 	imageHeight      string
@@ -121,11 +123,15 @@ func fetchValidSVG(t *testing.T, cards *httptest.Server, path string) renderedCa
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	rendered := renderedCard{status: response.StatusCode, header: response.Header}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := renderedCard{status: response.StatusCode, header: response.Header, body: string(body)}
 	if contentType := response.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "image/svg+xml") {
 		t.Fatalf("GET %s: Content-Type %q, want image/svg+xml", path, contentType)
 	}
-	decoder := xml.NewDecoder(response.Body)
+	decoder := xml.NewDecoder(bytes.NewReader(body))
 	textDepth, textContent := 0, ""
 	for {
 		token, err := decoder.Token()
@@ -224,8 +230,12 @@ func TestInvalidOptions(t *testing.T) {
 		"/top.svg?limit=11",
 		"/stats.svg?period=decade",
 		"/stats.svg?accent=red",
-		"/now-playing.svg?backdrop=maybe",
+		"/stats.svg?background=navy",
 		"/stats.svg?margin_bottom=-5",
+		"/stats.svg?hide=bars",
+		"/stats.svg?title=" + strings.Repeat("a", maxTitleLength+1),
+		"/now-playing.svg?hide=lyrics",
+		"/top.svg?height=tall",
 	} {
 		t.Run(path, func(t *testing.T) {
 			rendered := fetchValidSVG(t, cards, path)
@@ -281,5 +291,54 @@ func TestMarginBottomAddsSpaceBelowTheCard(t *testing.T) {
 	}
 	if plain.imageHeight != "208" || spaced.imageHeight != "248" {
 		t.Errorf("image heights %s and %s, want 208 and 248", plain.imageHeight, spaced.imageHeight)
+	}
+}
+
+func TestCardOptions(t *testing.T) {
+	_, cards := newServerWithFakeKoito(t, time.Minute)
+	for _, tc := range []struct {
+		path         string
+		shows        []string
+		hides        []string
+		cardHeight   string
+		bodyContains []string
+		noImages     bool
+	}{
+		{path: "/stats.svg?title=My%20week", shows: []string{"My week"}, hides: []string{"Listening stats"}},
+		{path: "/top.svg?title=On%20repeat", shows: []string{"On repeat"}, hides: []string{"Top artists"}},
+		{path: "/stats.svg?hide=streak,period", hides: []string{"3-day streak", "Past 7 days"}},
+		{path: "/stats.svg?hide=chart", hides: []string{"Nov 10"}, cardHeight: "118"},
+		{path: "/top.svg?type=tracks&hide=plays&hide=art", hides: []string{"3 plays"}, noImages: true},
+		{path: "/now-playing.svg?hide=art,backdrop", shows: []string{"LAST PLAYED"}, noImages: true},
+		{path: "/top.svg?height=400", cardHeight: "400"},
+		{path: "/top.svg?background=123456&text=abcdef", bodyContains: []string{"#123456", "#abcdef"}},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			rendered := fetchValidSVG(t, cards, tc.path)
+			if rendered.status != http.StatusOK {
+				t.Fatalf("status %d, want 200; texts %q", rendered.status, rendered.texts)
+			}
+			for _, want := range tc.shows {
+				if !rendered.hasText(want) {
+					t.Errorf("no text %q in %q", want, rendered.texts)
+				}
+			}
+			for _, unwanted := range tc.hides {
+				if rendered.hasText(unwanted) {
+					t.Errorf("text %q should be hidden; texts %q", unwanted, rendered.texts)
+				}
+			}
+			if tc.cardHeight != "" && rendered.backgroundHeight != tc.cardHeight {
+				t.Errorf("card height %s, want %s", rendered.backgroundHeight, tc.cardHeight)
+			}
+			for _, want := range tc.bodyContains {
+				if !strings.Contains(rendered.body, want) {
+					t.Errorf("SVG doesn't contain %q", want)
+				}
+			}
+			if tc.noImages && len(rendered.imageHrefs) > 0 {
+				t.Errorf("got %d images, want none", len(rendered.imageHrefs))
+			}
+		})
 	}
 }

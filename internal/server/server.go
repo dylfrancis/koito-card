@@ -89,8 +89,8 @@ func (s *Server) serveCard(render renderCard, policy cachePolicy) http.HandlerFu
 }
 
 func (s *Server) nowPlayingCard(ctx context.Context, query url.Values, options card.Options) (string, error) {
-	withBackdrop, err := parseBool(query, "backdrop", true)
-	if err != nil {
+	var err error
+	if options.Hidden, err = parseHidden(query, "art", "backdrop"); err != nil {
 		return "", err
 	}
 	listen, playing, err := s.koito.NowPlaying(ctx)
@@ -99,8 +99,10 @@ func (s *Server) nowPlayingCard(ctx context.Context, query url.Values, options c
 	}
 	var artURI, backdropURI string
 	if listen != nil {
-		artURI = s.koito.ImageDataURI(ctx, listen.Track.Image, koito.SizeSmall)
-		if withBackdrop {
+		if !options.Hidden["art"] {
+			artURI = s.koito.ImageDataURI(ctx, listen.Track.Image, koito.SizeSmall)
+		}
+		if !options.Hidden["backdrop"] {
 			backdropURI = s.koito.ImageDataURI(ctx, listen.Track.Image, koito.SizeXS)
 		}
 	}
@@ -120,15 +122,29 @@ func (s *Server) topCard(ctx context.Context, query url.Values, options card.Opt
 	if err != nil {
 		return "", err
 	}
+	minHeight, err := parseInt(query, "height", 0, 0, 1500)
+	if err != nil {
+		return "", err
+	}
+	if options.Title, err = parseTitle(query); err != nil {
+		return "", err
+	}
+	if options.Hidden, err = parseHidden(query, "period", "rank", "art", "plays", "bars"); err != nil {
+		return "", err
+	}
 	items, err := s.koito.Top(ctx, kind, period, limit)
 	if err != nil {
 		return "", err
 	}
-	images := make([]koito.Image, len(items))
-	for i, ranked := range items {
-		images[i] = ranked.Item.Image
+	artURIs := make([]string, len(items))
+	if !options.Hidden["art"] {
+		images := make([]koito.Image, len(items))
+		for i, ranked := range items {
+			images[i] = ranked.Item.Image
+		}
+		artURIs = s.koito.ImageDataURIs(ctx, images, koito.SizeSmall)
 	}
-	return card.Top(kind, period, items, s.koito.ImageDataURIs(ctx, images, koito.SizeSmall), options), nil
+	return card.Top(kind, period, items, artURIs, minHeight, options), nil
 }
 
 func (s *Server) statsCard(ctx context.Context, query url.Values, options card.Options) (string, error) {
@@ -136,13 +152,25 @@ func (s *Server) statsCard(ctx context.Context, query url.Values, options card.O
 	if err != nil {
 		return "", err
 	}
+	if options.Title, err = parseTitle(query); err != nil {
+		return "", err
+	}
+	if options.Hidden, err = parseHidden(query, "streak", "chart", "period"); err != nil {
+		return "", err
+	}
 	totals, err := s.koito.Stats(ctx, period)
 	if err != nil {
 		return "", err
 	}
-	chart, streakDays, err := s.activityChart(ctx, period)
-	if err != nil {
-		return "", err
+	var chart *card.Series
+	streakDays := 0
+	if !options.Hidden["chart"] || !options.Hidden["streak"] {
+		if chart, streakDays, err = s.activityChart(ctx, period); err != nil {
+			return "", err
+		}
+	}
+	if options.Hidden["chart"] {
+		chart = nil
 	}
 	return card.Stats(period, totals, chart, streakDays, options), nil
 }

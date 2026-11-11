@@ -15,22 +15,28 @@ type Series struct {
 
 // Stats draws the activity chart only when series is non-nil.
 func Stats(period string, totals koito.Stats, series *Series, streakDays int, options Options) string {
-	const title = "Listening stats"
+	title := orDefault(options.Title, "Listening stats")
 	hasChart := series != nil && len(series.Values) > 0
 	height := 118
 	if hasChart {
 		height = 208
 	}
+
+	showStreak := streakDays >= 2 && !options.Hidden["streak"]
+	chipText := fmt.Sprintf("%d-day streak", streakDays)
+	chipWidth := textWidth(chipText, 11, true) + 18
+	reservedForChip := 0.0
+	if showStreak {
+		reservedForChip = chipWidth + 10
+	}
 	var body strings.Builder
-	fmt.Fprintf(&body, `<text class="heading" x="%d" y="34">%s</text>`, padding, title)
-	if streakDays >= 2 {
-		chipText := fmt.Sprintf("%d-day streak", streakDays)
-		chipX := padding + textWidth(title, 16, true) + 10
-		chipWidth := textWidth(chipText, 11, true) + 18
+	header, titleEnd := cardHeader(title, period, reservedForChip, options)
+	body.WriteString(header)
+	if showStreak {
+		chipX := titleEnd + 10
 		fmt.Fprintf(&body, `<rect class="tint" x="%.1f" y="19" width="%.1f" height="20" rx="10"/>`, chipX, chipWidth)
 		fmt.Fprintf(&body, `<text class="accent chip" x="%.1f" y="33" text-anchor="middle">%s</text>`, chipX+chipWidth/2, chipText)
 	}
-	fmt.Fprintf(&body, `<text class="muted small" x="%d" y="34" text-anchor="end">%s</text>`, cardWidth-padding, periodLabels[period])
 
 	listenTime, listenTimeUnit := formatListenTime(totals.MinutesListened)
 	figures := []struct{ value, label string }{
@@ -52,8 +58,8 @@ func Stats(period string, totals koito.Stats, series *Series, streakDays int, op
 		fmt.Fprintf(&body, `<text class="muted tiny" x="%d" y="193">%s</text>`, padding, escapeXML(series.From))
 		fmt.Fprintf(&body, `<text class="muted tiny" x="%d" y="193" text-anchor="end">%s</text>`, cardWidth-padding, escapeXML(series.To))
 	}
-	ariaLabel := fmt.Sprintf("Koito listening stats, %s: %s plays, %s %s",
-		strings.ToLower(periodLabels[period]), withCommas(totals.ListenCount), listenTime, strings.ToLower(listenTimeUnit))
+	ariaLabel := fmt.Sprintf("%s, %s: %s plays, %s %s",
+		title, strings.ToLower(periodLabels[period]), withCommas(totals.ListenCount), listenTime, strings.ToLower(listenTimeUnit))
 	return document(cardWidth, height, ariaLabel, options, "", body.String())
 }
 

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dylfrancis/koito-card/internal/card"
 )
@@ -25,11 +26,14 @@ func parseOptions(query url.Values) (card.Options, error) {
 		return options, err
 	}
 	options.Theme = theme
-	if accent := strings.TrimSpace(query.Get("accent")); accent != "" {
-		if !hexColorPattern.MatchString(accent) {
-			return options, badRequest("accent must be a hex color, like accent=ff5500")
-		}
-		options.Accent = "#" + strings.TrimPrefix(accent, "#")
+	if options.Accent, err = parseHexColor(query, "accent"); err != nil {
+		return options, err
+	}
+	if options.Background, err = parseHexColor(query, "background"); err != nil {
+		return options, err
+	}
+	if options.Text, err = parseHexColor(query, "text"); err != nil {
+		return options, err
 	}
 	if options.Border, err = parseBool(query, "border", true); err != nil {
 		return options, err
@@ -38,6 +42,45 @@ func parseOptions(query url.Values) (card.Options, error) {
 		return options, err
 	}
 	return options, nil
+}
+
+func parseHexColor(query url.Values, key string) (string, error) {
+	value := strings.TrimSpace(query.Get(key))
+	if value == "" {
+		return "", nil
+	}
+	if !hexColorPattern.MatchString(value) {
+		return "", badRequest(fmt.Sprintf("%s must be a hex color, like %s=ff5500", key, key))
+	}
+	return "#" + strings.TrimPrefix(value, "#"), nil
+}
+
+// parseHidden accepts hide=a,b and repeated hide parameters.
+func parseHidden(query url.Values, hideable ...string) (map[string]bool, error) {
+	hidden := map[string]bool{}
+	for _, list := range query["hide"] {
+		for _, part := range strings.Split(list, ",") {
+			part = strings.ToLower(strings.TrimSpace(part))
+			if part == "" {
+				continue
+			}
+			if !slices.Contains(hideable, part) {
+				return nil, badRequest("hide can include: " + strings.Join(hideable, ", "))
+			}
+			hidden[part] = true
+		}
+	}
+	return hidden, nil
+}
+
+const maxTitleLength = 60
+
+func parseTitle(query url.Values) (string, error) {
+	title := strings.TrimSpace(query.Get("title"))
+	if utf8.RuneCountInString(title) > maxTitleLength {
+		return "", badRequest(fmt.Sprintf("title can be at most %d characters", maxTitleLength))
+	}
+	return title, nil
 }
 
 func parseChoice(query url.Values, key, fallback string, allowed ...string) (string, error) {

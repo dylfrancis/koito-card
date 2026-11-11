@@ -8,8 +8,12 @@ import (
 type Options struct {
 	Theme        string
 	Accent       string
+	Background   string
+	Text         string
 	Border       bool
 	MarginBottom int
+	Title        string
+	Hidden       map[string]bool
 }
 
 type palette struct {
@@ -22,18 +26,22 @@ var (
 	darkPalette  = palette{"#0d1117", "#30363d", "#e6edf3", "#9198a1", "#21262d", "#f778ba", 0.16, 0.40}
 )
 
-func (p palette) cssVariables(accentOverride string) string {
-	accent := p.accent
-	if accentOverride != "" {
-		accent = accentOverride
-	}
+func (p palette) cssVariables(options Options) string {
 	return fmt.Sprintf("--background:%s;--border:%s;--text:%s;--muted:%s;--track:%s;--accent:%s;--tint:%.2f;--backdrop:%.2f",
-		p.background, p.border, p.text, p.muted, p.track, accent, p.tintOpacity, p.backdropOpacity)
+		orDefault(options.Background, p.background), p.border, orDefault(options.Text, p.text), p.muted, p.track,
+		orDefault(options.Accent, p.accent), p.tintOpacity, p.backdropOpacity)
+}
+
+func orDefault(custom, fallback string) string {
+	if custom != "" {
+		return custom
+	}
+	return fallback
 }
 
 func themeCSS(options Options) string {
-	light := "svg{" + lightPalette.cssVariables(options.Accent) + "}"
-	dark := "svg{" + darkPalette.cssVariables(options.Accent) + "}"
+	light := "svg{" + lightPalette.cssVariables(options) + "}"
+	dark := "svg{" + darkPalette.cssVariables(options) + "}"
 	switch options.Theme {
 	case "light":
 		return light
@@ -105,6 +113,20 @@ func cover(artURI string, x, y, size float64, clipShape string) string {
 
 var periodLabels = map[string]string{
 	"day": "Past 24 hours", "week": "Past 7 days", "month": "Past 30 days", "year": "Past year", "all_time": "All time",
+}
+
+// cardHeader keeps reservedWidth free after the title and returns where the title ends.
+func cardHeader(title, period string, reservedWidth float64, options Options) (svg string, titleEnd float64) {
+	var header strings.Builder
+	titleMaxWidth := float64(cardWidth-2*padding) - reservedWidth
+	if !options.Hidden["period"] {
+		label := periodLabels[period]
+		fmt.Fprintf(&header, `<text class="muted small" x="%d" y="34" text-anchor="end">%s</text>`, cardWidth-padding, label)
+		titleMaxWidth -= textWidth(label, 12, false) + 12
+	}
+	shownTitle := truncateToWidth(title, titleMaxWidth, 16, true)
+	fmt.Fprintf(&header, `<text class="heading" x="%d" y="34">%s</text>`, padding, escapeXML(shownTitle))
+	return header.String(), padding + textWidth(shownTitle, 16, true)
 }
 
 // Error is served instead of a broken image.
