@@ -1,0 +1,10 @@
+# Run in the same compose project as Koito so http://koito:4110 resolves.
+services:
+  koito-card:
+    image: ghcr.io/dylfrancis/koito-card:latest
+    container_name: koito-card
+    environment:
+      KOITO_URL: http://koito:4110
+    ports:
+      - "4111:8080"
+    restart: unless-stopped
