@@ -93,10 +93,21 @@ func newServerWithFakeKoito(t *testing.T, cacheTTL time.Duration) (*fakeKoito, *
 }
 
 type renderedCard struct {
-	status     int
-	header     http.Header
-	texts      []string
-	imageHrefs []string
+	status           int
+	header           http.Header
+	texts            []string
+	imageHrefs       []string
+	imageHeight      string
+	backgroundHeight string
+}
+
+func attribute(element xml.StartElement, name string) string {
+	for _, attr := range element.Attr {
+		if attr.Name.Local == name {
+			return attr.Value
+		}
+	}
+	return ""
 }
 
 func (rendered renderedCard) hasText(want string) bool {
@@ -131,12 +142,13 @@ func fetchValidSVG(t *testing.T, cards *httptest.Server, path string) renderedCa
 			} else if textDepth > 0 {
 				textDepth++
 			}
-			if token.Name.Local == "image" {
-				for _, attr := range token.Attr {
-					if attr.Name.Local == "href" {
-						rendered.imageHrefs = append(rendered.imageHrefs, attr.Value)
-					}
-				}
+			switch {
+			case token.Name.Local == "svg":
+				rendered.imageHeight = attribute(token, "height")
+			case token.Name.Local == "rect" && attribute(token, "class") == "background":
+				rendered.backgroundHeight = attribute(token, "height")
+			case token.Name.Local == "image":
+				rendered.imageHrefs = append(rendered.imageHrefs, attribute(token, "href"))
 			}
 		case xml.CharData:
 			if textDepth > 0 {
@@ -213,6 +225,7 @@ func TestInvalidOptions(t *testing.T) {
 		"/stats.svg?period=decade",
 		"/stats.svg?accent=red",
 		"/now-playing.svg?backdrop=maybe",
+		"/stats.svg?margin_bottom=-5",
 	} {
 		t.Run(path, func(t *testing.T) {
 			rendered := fetchValidSVG(t, cards, path)
@@ -256,5 +269,17 @@ func TestAllTimeChartStartsAtFirstListen(t *testing.T) {
 	labels := fetchValidSVG(t, cards, "/stats.svg?period=all_time").texts
 	if !slices.Contains(labels, "2021") || !slices.Contains(labels, "2022") || slices.Contains(labels, "2020") {
 		t.Errorf("chart labels %q; want 2021 to 2022, skipping the empty 2020 months", labels)
+	}
+}
+
+func TestMarginBottomAddsSpaceBelowTheCard(t *testing.T) {
+	_, cards := newServerWithFakeKoito(t, time.Minute)
+	plain := fetchValidSVG(t, cards, "/stats.svg")
+	spaced := fetchValidSVG(t, cards, "/stats.svg?margin_bottom=40")
+	if spaced.backgroundHeight != plain.backgroundHeight {
+		t.Errorf("card height %s, want it unchanged at %s", spaced.backgroundHeight, plain.backgroundHeight)
+	}
+	if plain.imageHeight != "208" || spaced.imageHeight != "248" {
+		t.Errorf("image heights %s and %s, want 208 and 248", plain.imageHeight, spaced.imageHeight)
 	}
 }

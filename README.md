@@ -25,6 +25,7 @@ Every card also takes:
 | `theme` | `auto` (default; follows the viewer's system), `light` or `dark` |
 | `accent` | a hex color without `#`, like `accent=ff5500` |
 | `border` | `true` (default) or `false` |
+| `margin_bottom` | transparent space below the card, 0 to 200 (default 0), for spacing stacked cards |
 
 For example, `/top.svg?type=albums&period=year&limit=3&theme=dark`.
 
@@ -76,6 +77,22 @@ Or use plain Markdown with the default `theme=auto`, which follows the viewer's 
 ```markdown
 ![Top artists this week](https://cards.example.com/top.svg?type=artists)
 ```
+
+### Two columns
+
+GitHub strips CSS from READMEs, but it keeps `align`, which floats images. Cards aligned left stack in the left column while the rest flow on the right, so each column fills from the top. `width="48%"` leaves room for the 20px padding GitHub adds to aligned images, and `margin_bottom=40` gives about the same gap vertically as between the columns.
+
+```html
+<p align="right">
+<a href="https://cards.example.com"><img src="https://cards.example.com/now-playing.svg?margin_bottom=40" width="48%" align="left"></a>
+<a href="https://cards.example.com"><img src="https://cards.example.com/top.svg?type=artists&limit=6" width="48%" align="left"></a>
+<a href="https://cards.example.com"><img src="https://cards.example.com/stats.svg?margin_bottom=40" width="48%" align="top"></a>
+<a href="https://cards.example.com"><img src="https://cards.example.com/top.svg?type=tracks" width="48%" align="top"></a>
+</p>
+<br clear="all">
+```
+
+Keep each card a plain `<img>` inside its link. GitHub moves an `<img>` out of a `<picture>` inside a link, which breaks the theme switch.
 
 ### How fresh is it?
 

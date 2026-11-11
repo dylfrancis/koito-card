@@ -6,9 +6,10 @@ import (
 )
 
 type Options struct {
-	Theme  string
-	Accent string
-	Border bool
+	Theme        string
+	Accent       string
+	Border       bool
+	MarginBottom int
 }
 
 type palette struct {
@@ -72,8 +73,9 @@ const (
 )
 
 func document(width, height int, ariaLabel string, options Options, defs, body string) string {
+	imageHeight := height + options.MarginBottom
 	var svg strings.Builder
-	fmt.Fprintf(&svg, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="%s">`, width, height, width, height, escapeXML(ariaLabel))
+	fmt.Fprintf(&svg, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="%s">`, width, imageHeight, width, imageHeight, escapeXML(ariaLabel))
 	fmt.Fprintf(&svg, `<title>%s</title><style>%s%s</style>`, escapeXML(ariaLabel), themeCSS(options), cardCSS)
 	fmt.Fprintf(&svg, `<defs><clipPath id="card-shape"><rect width="%d" height="%d" rx="10"/></clipPath>`, width, height)
 	svg.WriteString(`<clipPath id="rounded-square" clipPathUnits="objectBoundingBox"><rect width="1" height="1" rx=".12"/></clipPath>`)

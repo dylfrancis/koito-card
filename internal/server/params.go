@@ -34,6 +34,9 @@ func parseOptions(query url.Values) (card.Options, error) {
 	if options.Border, err = parseBool(query, "border", true); err != nil {
 		return options, err
 	}
+	if options.MarginBottom, err = parseInt(query, "margin_bottom", 0, 0, 200); err != nil {
+		return options, err
+	}
 	return options, nil
 }
 
