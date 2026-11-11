@@ -84,7 +84,7 @@ Now playing tells every cache, GitHub's proxy included, not to keep it, so it's 
 ## Development
 
 ```sh
-mise install                      # or any Go 1.24+
+mise install                      # or Go 1.27.4+
 KOITO_URL=http://localhost:4110 go run .
 go test ./...
 ```
